@@ -52,6 +52,15 @@
       "current_tariff": {
         "name": "Current tariff"
       },
+      "tariff_date_on": {
+        "name": "Tariff start date"
+      },
+      "tariff_date_off": {
+        "name": "Tariff end date"
+      },
+      "tariff_days_left": {
+        "name": "Days until tariff ends"
+      },
       "internet_status": {
         "name": "Internet status"
       },

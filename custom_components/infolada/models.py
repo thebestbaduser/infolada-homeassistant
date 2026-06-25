@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from typing import Any
 
 from .const import DEFAULT_CURRENCY, INTERNET_USER_TYPES
@@ -28,6 +29,7 @@ def normalize_account_data(
     state = primary_user.get("state") if isinstance(primary_user.get("state"), dict) else {}
     internet_status = state.get("title") or state.get("name") or primary_user.get("type_definition")
     current_tariff = _extract_tariff_name(primary_user)
+    plan_fields = _extract_plan_fields(primary_user)
     ktv_data = _normalize_service_account(ktv, "ktv")
     telephone_data = _normalize_service_account(telephone, "telephone")
 
@@ -45,6 +47,7 @@ def normalize_account_data(
         "can_pay": bool(account.get("can_pay")),
         "internet_login": as_str(primary_user.get("login") or primary_user.get("user_name")),
         "current_tariff": current_tariff,
+        **plan_fields,
         "internet_status": as_str(internet_status),
         "internet_users_count": len(internet_users),
         "internet_users": [
@@ -95,6 +98,46 @@ def format_fio_initials(name: str | None) -> str | None:
     if not parts:
         return None
     return " ".join(f"{part[0].upper()}." for part in parts)
+
+
+def parse_infolada_datetime(value: Any) -> str | None:
+    """Parse API datetime 'DD.MM.YYYY HH:MM:SS' to an ISO string."""
+    text = as_str(value)
+    if not text:
+        return None
+    try:
+        return datetime.strptime(text, "%d.%m.%Y %H:%M:%S").isoformat()
+    except ValueError:
+        _LOGGER.debug("Failed to parse datetime value: %s", value)
+        return None
+
+
+def _extract_plan_fields(user: dict[str, Any]) -> dict[str, Any]:
+    """Return tariff period fields from a user plan payload."""
+    plan = user.get("plan")
+    if not isinstance(plan, dict):
+        return {
+            "tariff_date_on": None,
+            "tariff_date_off": None,
+            "tariff_days_left": None,
+        }
+
+    left_day = plan.get("left_day")
+    days_left: int | None = None
+    if left_day is not None and left_day != "":
+        if isinstance(left_day, bool):
+            days_left = None
+        elif isinstance(left_day, int):
+            days_left = left_day
+        else:
+            parsed = to_float(left_day)
+            days_left = int(parsed) if parsed is not None else None
+
+    return {
+        "tariff_date_on": parse_infolada_datetime(plan.get("date_on")),
+        "tariff_date_off": parse_infolada_datetime(plan.get("date_off")),
+        "tariff_days_left": days_left,
+    }
 
 
 def _extract_tariff_name(user: dict[str, Any]) -> str | None:

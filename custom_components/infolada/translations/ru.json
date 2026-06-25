@@ -52,6 +52,15 @@
       "current_tariff": {
         "name": "Текущий тариф"
       },
+      "tariff_date_on": {
+        "name": "Дата начала тарифа"
+      },
+      "tariff_date_off": {
+        "name": "Дата окончания тарифа"
+      },
+      "tariff_days_left": {
+        "name": "Дней до окончания тарифа"
+      },
       "internet_status": {
         "name": "Статус интернета"
       },

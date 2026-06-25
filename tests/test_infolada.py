@@ -60,7 +60,12 @@ class TestInfoladaNormalization(unittest.TestCase):
                     "user_type": "ethernet",
                     "login": "demo",
                     "type_definition": "Пользователь интернет",
-                    "plan": {"plan_name_print": "Интернет 100 Мбит/с"},
+                    "plan": {
+                        "plan_name_print": "Интернет 100 Мбит/с",
+                        "date_on": "01.07.2020 00:44:41",
+                        "date_off": "03.07.2026 23:59:59",
+                        "left_day": 8,
+                    },
                     "state": {"title": "Включен"},
                 }
             ],
@@ -73,6 +78,9 @@ class TestInfoladaNormalization(unittest.TestCase):
         self.assertEqual(data["bonus"], 10.0)
         self.assertEqual(data["traffic_mb"], 1024.0)
         self.assertEqual(data["current_tariff"], "Интернет 100 Мбит/с")
+        self.assertEqual(data["tariff_date_on"], "2020-07-01T00:44:41")
+        self.assertEqual(data["tariff_date_off"], "2026-07-03T23:59:59")
+        self.assertEqual(data["tariff_days_left"], 8)
         self.assertEqual(data["internet_status"], "Включен")
         self.assertEqual(data["internet_users_count"], 1)
 
@@ -113,6 +121,14 @@ class TestInfoladaNormalization(unittest.TestCase):
         """Parse numeric strings from the API."""
         self.assertEqual(models.to_float("1 234,56"), 1234.56)
         self.assertIsNone(models.to_float("not-a-number"))
+
+    def test_parse_infolada_datetime(self) -> None:
+        """Parse API datetime strings."""
+        self.assertEqual(
+            models.parse_infolada_datetime("01.07.2020 00:44:41"),
+            "2020-07-01T00:44:41",
+        )
+        self.assertIsNone(models.parse_infolada_datetime("invalid"))
 
 
 if __name__ == "__main__":

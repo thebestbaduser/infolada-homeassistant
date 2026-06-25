@@ -7,7 +7,7 @@ from typing import Any
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import EntityCategory, UnitOfInformation
+from homeassistant.const import EntityCategory, UnitOfInformation, UnitOfTime
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
@@ -88,6 +88,21 @@ async def async_setup_entry(
             InfoladaNeedPaySensor(coordinator, entry),
             InfoladaBonusSensor(coordinator, entry),
             InfoladaTrafficSensor(coordinator, entry),
+            InfoladaTimestampSensor(
+                coordinator,
+                entry,
+                "tariff_date_on",
+                "tariff_date_on",
+                "mdi:calendar-start",
+            ),
+            InfoladaTimestampSensor(
+                coordinator,
+                entry,
+                "tariff_date_off",
+                "tariff_date_off",
+                "mdi:calendar-end",
+            ),
+            InfoladaTariffDaysLeftSensor(coordinator, entry),
             InfoladaLastUpdateSensor(coordinator, entry),
         ]
     )
@@ -364,6 +379,77 @@ class InfoladaTrafficSensor(InfoladaBaseSensor):
             return None
         try:
             return float(self._restored_state)
+        except (TypeError, ValueError):
+            return None
+
+
+class InfoladaTimestampSensor(InfoladaBaseSensor):
+    """Timestamp sensor backed by one normalized ISO field."""
+
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+
+    def __init__(
+        self,
+        coordinator: InfoladaDataUpdateCoordinator,
+        entry: ConfigEntry,
+        value_key: str,
+        translation_key: str,
+        icon: str,
+        *,
+        entity_category: EntityCategory | None = None,
+        enabled_by_default: bool = True,
+    ) -> None:
+        """Initialize the timestamp sensor."""
+        super().__init__(coordinator, entry)
+        self._value_key = value_key
+        self._attr_translation_key = translation_key
+        self._attr_icon = icon
+        self._attr_entity_category = entity_category
+        self._attr_entity_registry_enabled_default = enabled_by_default
+        self._attr_unique_id = f"{entry.entry_id}_{self._login_slug}_{value_key}"
+        self.entity_id = f"sensor.infolada_{self._login_slug}_{value_key}"
+
+    @property
+    def native_value(self):
+        """Return the parsed timestamp."""
+        value = self.coordinator.data.get(self._value_key)
+        if value is None:
+            value = self._restored_state
+        if value is None:
+            return None
+        return dt_util.parse_datetime(str(value))
+
+
+class InfoladaTariffDaysLeftSensor(InfoladaBaseSensor):
+    """Days remaining until the current tariff ends."""
+
+    _attr_translation_key = "tariff_days_left"
+    _attr_icon = "mdi:calendar-alert"
+    _attr_native_unit_of_measurement = UnitOfTime.DAYS
+    _attr_suggested_display_precision = 0
+
+    def __init__(
+        self,
+        coordinator: InfoladaDataUpdateCoordinator,
+        entry: ConfigEntry,
+    ) -> None:
+        """Initialize the days-left sensor."""
+        super().__init__(coordinator, entry)
+        self._attr_unique_id = f"{entry.entry_id}_{self._login_slug}_tariff_days_left"
+        self.entity_id = f"sensor.infolada_{self._login_slug}_tariff_days_left"
+
+    @property
+    def native_value(self) -> int | None:
+        """Return the number of days left on the tariff."""
+        value = self.coordinator.data.get("tariff_days_left")
+        if isinstance(value, int):
+            return value
+        if isinstance(value, float):
+            return int(value)
+        if self._restored_state is None:
+            return None
+        try:
+            return int(float(self._restored_state))
         except (TypeError, ValueError):
             return None
 
