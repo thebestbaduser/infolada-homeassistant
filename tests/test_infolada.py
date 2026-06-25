@@ -67,7 +67,7 @@ class TestInfoladaNormalization(unittest.TestCase):
         )
 
         self.assertEqual(data["contract_number"], "123456")
-        self.assertEqual(data["contract_owner"], "Иван Иванов")
+        self.assertEqual(data["contract_owner"], "И. И.")
         self.assertEqual(data["need_pay"], 150.5)
         self.assertEqual(data["current_balance"], 420.75)
         self.assertEqual(data["bonus"], 10.0)
@@ -99,6 +99,15 @@ class TestInfoladaNormalization(unittest.TestCase):
         self.assertEqual(data["ktv_balance"], 20.0)
         self.assertEqual(data["ktv_plan_price"], 240.0)
         self.assertFalse(data["telephone_available"])
+
+    def test_format_fio_initials(self) -> None:
+        """Convert full names to initials."""
+        self.assertEqual(
+            models.format_fio_initials("Терехин Анатолий Сергеевич"),
+            "Т. А. С.",
+        )
+        self.assertEqual(models.format_fio_initials("Иван Иванов"), "И. И.")
+        self.assertIsNone(models.format_fio_initials(None))
 
     def test_to_float(self) -> None:
         """Parse numeric strings from the API."""

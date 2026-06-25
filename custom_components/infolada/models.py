@@ -34,7 +34,9 @@ def normalize_account_data(
     return {
         "login": login,
         "contract_number": as_str(contract.get("conto_num")),
-        "contract_owner": as_str(contract.get("client_name") or contract.get("client_name_io")),
+        "contract_owner": format_fio_initials(
+            as_str(contract.get("client_name") or contract.get("client_name_io"))
+        ),
         "need_pay": to_float(contract.get("need_pay")),
         "current_balance": to_float(account.get("balance")),
         "balance_currency": DEFAULT_CURRENCY,
@@ -83,6 +85,16 @@ def _normalize_service_account(payload: Any, prefix: str) -> dict[str, Any]:
         f"{prefix}_can_pay": bool(data.get("can_pay")),
     }
     return result
+
+
+def format_fio_initials(name: str | None) -> str | None:
+    """Return a Russian full name as initials, e.g. 'Т. А. С.'."""
+    if not name:
+        return None
+    parts = [part for part in name.split() if part]
+    if not parts:
+        return None
+    return " ".join(f"{part[0].upper()}." for part in parts)
 
 
 def _extract_tariff_name(user: dict[str, Any]) -> str | None:
