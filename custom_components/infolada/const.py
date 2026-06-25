@@ -12,6 +12,7 @@ MAX_SCAN_INTERVAL_HOURS = 24
 BASE_URL = "https://infolada.ru"
 AUTH_URL = f"{BASE_URL}/lk/auth"
 API_URL = f"{BASE_URL}/api/v2"
+LK_URL = f"{BASE_URL}/lk/"
 PORTAL_URL = "https://start.infolada.ru/auth?tab=portal"
 PAYMENT_URL = f"{BASE_URL}/lk/#/payment/i"
 

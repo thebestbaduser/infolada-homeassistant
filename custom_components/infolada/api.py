@@ -16,11 +16,20 @@ from .const import (
     AUTH_URL,
     BASE_URL,
     COOKIE_ACCESS_TOKEN,
+    LK_URL,
     PORTAL_URL,
 )
 from .models import as_dict, as_user_list, normalize_account_data
 
 _LOGGER = logging.getLogger(__name__)
+
+_BROWSER_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    ),
+    "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
+}
 
 _CSRF_RE = re.compile(r'name="_csrfy"\s+value="([^"]+)"')
 _PORTAL_WHO_RE = re.compile(r'name="PortalForm\[who\]"\s+value="([^"]+)"')
@@ -53,6 +62,7 @@ class InfoladaApiClient:
         self._session = async_create_clientsession(
             hass,
             cookie_jar=aiohttp.CookieJar(unsafe=True, quote_cookie=False),
+            headers=_BROWSER_HEADERS,
         )
         self._login = login
         self._password = password
@@ -90,53 +100,24 @@ class InfoladaApiClient:
         self._authenticated = True
 
     async def _authenticate(self) -> None:
-        """Perform a full login and token refresh sequence."""
-        auth_error: InfoladaAuthError | None = None
+        """Perform the same login flow as start.infolada.ru portal."""
+        await self._login_portal()
+        await self._bootstrap_lk_session()
+        await self._refresh_access_token(force=False)
+        await self._refresh_access_token(force=True)
 
-        try:
-            await self._login_json()
-        except InfoladaAuthError as err:
-            auth_error = err
-            _LOGGER.debug("JSON auth failed, trying portal form: %s", err)
-
-        if not self._has_session_cookies() and not self._get_access_token():
-            try:
-                await self._login_portal()
-                auth_error = None
-            except InfoladaAuthError as err:
-                auth_error = err
-
-        if not self._has_session_cookies() and not self._get_access_token():
-            raise auth_error or InfoladaAuthError("Invalid login or password")
+        if not self._get_access_token() and not self._has_session_cookies():
+            raise InfoladaAuthError("Invalid login or password")
 
         if not self._get_access_token():
-            await self._refresh_access_token(force=False)
-        if not self._get_access_token():
-            await self._refresh_access_token(force=True)
-
-    async def _login_json(self) -> None:
-        """Submit credentials to the LK JSON auth endpoint."""
-        payload = {
-            "username": self._login,
-            "password": self._password,
-            "remember_me": True,
-        }
-        headers = {
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-            "Origin": BASE_URL,
-            "Referer": f"{BASE_URL}/lk/",
-        }
-
-        response, data = await self._request("POST", AUTH_URL, json=payload, headers=headers)
-        self._raise_for_auth_response(response, data)
+            raise InfoladaAuthError("No access token received after authentication")
 
     async def _login_portal(self) -> None:
-        """Submit credentials using the start.infolada.ru portal form."""
+        """Submit the portal form from start.infolada.ru."""
         response, html = await self._request(
             "GET",
             PORTAL_URL,
-            headers={"Accept": "text/html"},
+            headers={"Accept": "text/html,application/xhtml+xml"},
             expect_json=False,
         )
         if response.status >= 400:
@@ -158,7 +139,7 @@ class InfoladaApiClient:
             "PortalForm[sum]": sum_match.group(1),
         }
         headers = {
-            "Accept": "application/json",
+            "Accept": "text/html,application/json,*/*",
             "Content-Type": "application/x-www-form-urlencoded",
             "Origin": "https://start.infolada.ru",
             "Referer": PORTAL_URL,
@@ -171,28 +152,70 @@ class InfoladaApiClient:
             headers=headers,
             allow_redirects=False,
         )
-        self._raise_for_auth_response(response, data)
 
+        location = response.headers.get("Location", "")
         if response.status in {301, 302, 303, 307, 308}:
-            location = response.headers.get("Location", "")
             if "error" in location.lower():
                 raise InfoladaAuthError("Invalid login or password")
+            if "/lk" in location:
+                await self._follow_location(location)
+                return
+
+        if response.status == 401 or _is_auth_failure(data):
+            message = _extract_error_message(data) or "Invalid login or password"
+            raise InfoladaAuthError(message)
+
+        if isinstance(data, dict) and data.get("success") is False:
+            message = _extract_error_message(data) or "Authentication failed"
+            raise InfoladaAuthError(message)
+
+        if self._has_session_cookies() or self._get_access_token():
+            return
+
+        raise InfoladaAuthError("Invalid login or password")
+
+    async def _bootstrap_lk_session(self) -> None:
+        """Open the LK page so auth cookies are fully established."""
+        if self._get_access_token():
+            return
+
+        await self._request(
+            "GET",
+            LK_URL,
+            headers={"Accept": "text/html,application/xhtml+xml"},
+            expect_json=False,
+        )
+
+    async def _follow_location(self, location: str) -> None:
+        """Follow a redirect target returned by the portal auth endpoint."""
+        target = location if location.startswith("http") else f"{BASE_URL}{location}"
+        await self._request(
+            "GET",
+            target,
+            headers={"Accept": "text/html,application/xhtml+xml"},
+            expect_json=False,
+        )
 
     async def _refresh_access_token(self, *, force: bool) -> None:
-        """Exchange the session for a bearer token cookie."""
+        """Exchange the portal session for the ilkat bearer token."""
+        if self._get_access_token():
+            return
+
         url = f"{AUTH_URL}?forceRefresh=1" if force else AUTH_URL
         headers = {
-            "Accept": "application/json",
+            "Accept": "application/json, text/plain, */*",
             "Origin": BASE_URL,
-            "Referer": f"{BASE_URL}/lk/",
+            "Referer": LK_URL,
+            "X-Requested-With": "XMLHttpRequest",
         }
 
         response, data = await self._request("POST", url, headers=headers)
 
         if self._get_access_token():
+            _LOGGER.debug("Received Infolada access token after refresh (force=%s)", force)
             return
 
-        if _is_refresh_expire(data) and not force:
+        if _is_refresh_expire(data):
             return
 
         if response.status == 401 or _is_auth_failure(data):
@@ -208,8 +231,10 @@ class InfoladaApiClient:
         await self._ensure_authenticated()
 
         headers = {
-            "Accept": "application/json",
+            "Accept": "application/json, text/plain, */*",
             "Authorization": f"Bearer {self._get_access_token()}",
+            "Referer": LK_URL,
+            "X-Requested-With": "XMLHttpRequest",
         }
 
         response, data = await self._request("GET", f"{API_URL}{path}", headers=headers)
@@ -251,38 +276,6 @@ class InfoladaApiClient:
                 return response, data
         except ClientError as err:
             raise InfoladaConnectionError(str(err)) from err
-
-    def _raise_for_auth_response(
-        self,
-        response: aiohttp.ClientResponse,
-        data: Any,
-    ) -> None:
-        """Validate an authentication response."""
-        if response.status == 401 or _is_auth_failure(data):
-            message = _extract_error_message(data) or "Invalid login or password"
-            raise InfoladaAuthError(message)
-
-        if isinstance(data, dict) and data.get("success") is False:
-            message = _extract_error_message(data) or "Authentication failed"
-            raise InfoladaAuthError(message)
-
-        if response.status >= 400:
-            message = _extract_error_message(data) or f"Authentication failed ({response.status})"
-            raise InfoladaApiError(message)
-
-        if isinstance(data, dict) and data.get("success") is True:
-            return
-
-        if self._has_session_cookies() or self._get_access_token():
-            return
-
-        if response.status in {301, 302, 303, 307, 308}:
-            location = response.headers.get("Location", "")
-            if location and "error" not in location.lower():
-                return
-
-        if response.status == 200:
-            raise InfoladaAuthError("Invalid login or password")
 
     def _get_access_token(self) -> str | None:
         """Return the bearer token stored in cookies."""
