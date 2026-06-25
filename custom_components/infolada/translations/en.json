@@ -20,7 +20,8 @@
     "error": {
       "cannot_connect": "Failed to connect to the Infolada website.",
       "invalid_auth": "Invalid login or password.",
-      "unknown": "Unexpected error."
+      "api_error": "Connected, but failed to read account data. Check Home Assistant logs.",
+      "unknown": "Unexpected error. Check Home Assistant logs."
     },
     "abort": {
       "already_configured": "This account is already configured."

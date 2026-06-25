@@ -56,7 +56,13 @@ def normalize_account_data(
 
 def as_dict(value: Any) -> dict[str, Any]:
     """Return a dict payload or an empty dict."""
-    return value if isinstance(value, dict) else {}
+    if not isinstance(value, dict):
+        return {}
+    for key in ("data", "result", "payload"):
+        nested = value.get(key)
+        if isinstance(nested, dict):
+            return nested
+    return value
 
 
 def as_user_list(value: Any) -> list[dict[str, Any]]:

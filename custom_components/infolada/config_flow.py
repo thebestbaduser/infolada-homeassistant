@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import voluptuous as vol
@@ -10,10 +11,13 @@ from homeassistant.const import CONF_PASSWORD
 
 from .api import (
     InfoladaApiClient,
+    InfoladaApiError,
     InfoladaAuthError,
     InfoladaConnectionError,
     InfoladaError,
 )
+
+_LOGGER = logging.getLogger(__name__)
 from .const import CONF_LOGIN, CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL_HOURS, DOMAIN
 from .helpers import build_scan_interval_schema
 from .options_flow import InfoladaOptionsFlow
@@ -51,11 +55,20 @@ class InfoladaConfigFlow(ConfigFlow, domain=DOMAIN):
             )
             try:
                 await client.async_validate_credentials()
-            except InfoladaAuthError:
+            except InfoladaAuthError as err:
+                _LOGGER.warning("Infolada authentication failed for %s: %s", self._login, err)
                 errors["base"] = "invalid_auth"
-            except InfoladaConnectionError:
+            except InfoladaConnectionError as err:
+                _LOGGER.error("Infolada connection failed: %s", err)
                 errors["base"] = "cannot_connect"
-            except InfoladaError:
+            except InfoladaApiError as err:
+                _LOGGER.error("Infolada API error during setup: %s", err)
+                errors["base"] = "api_error"
+            except InfoladaError as err:
+                _LOGGER.error("Infolada setup failed: %s", err)
+                errors["base"] = "unknown"
+            except Exception:
+                _LOGGER.exception("Unexpected error during Infolada setup")
                 errors["base"] = "unknown"
             else:
                 self._title = _build_entry_title(self._login)
