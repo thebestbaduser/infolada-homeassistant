@@ -2,8 +2,8 @@
   "config": {
     "step": {
       "user": {
-        "title": "Добавление аккаунта ИнфоЛада",
-        "description": "Введите логин и пароль от личного кабинета https://start.infolada.ru/auth?tab=portal.",
+        "title": "ИнфоЛада",
+        "description": "Подключите личный кабинет интернет-провайдера ИнфоЛада (Тольятти). Введите логин и пароль от https://start.infolada.ru/auth?tab=portal.",
         "data": {
           "login": "Логин",
           "password": "Пароль"

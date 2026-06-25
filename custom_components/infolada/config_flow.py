@@ -25,7 +25,7 @@ from .options_flow import InfoladaOptionsFlow
 
 def _build_entry_title(login: str) -> str:
     """Build the config entry title."""
-    return f"Infolada: {login}"
+    return f"ИнфоЛада: {login}"
 
 
 class InfoladaConfigFlow(ConfigFlow, domain=DOMAIN):

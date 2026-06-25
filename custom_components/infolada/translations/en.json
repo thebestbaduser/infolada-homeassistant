@@ -2,8 +2,8 @@
   "config": {
     "step": {
       "user": {
-        "title": "Add Infolada account",
-        "description": "Enter your Infolada personal account login and password from https://start.infolada.ru/auth?tab=portal.",
+        "title": "Infolada",
+        "description": "Connect your Infolada personal account (Tolyatti, Russia). Enter login and password from https://start.infolada.ru/auth?tab=portal.",
         "data": {
           "login": "Login",
           "password": "Password"

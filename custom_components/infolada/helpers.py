@@ -18,16 +18,17 @@ from .const import (
 def build_device_info(login: str, login_slug: str, service: str = "internet") -> DeviceInfo:
     """Build device metadata for a service type."""
     service_names = {
-        "internet": ("Personal Account", "login"),
-        "ktv": ("Cable TV", "ktv"),
-        "telephone": ("Telephony", "telephone"),
+        "internet": ("Личный кабинет", "login"),
+        "ktv": ("Кабельное ТВ", "ktv"),
+        "telephone": ("Телефония", "telephone"),
     }
     model, suffix = service_names.get(service, service_names["internet"])
     return DeviceInfo(
         identifiers={(DOMAIN, f"{suffix}_{login_slug}")},
-        manufacturer="Infolada",
+        manufacturer="ИнфоЛада",
         model=model,
-        name=f"Infolada: {login}" if service == "internet" else f"Infolada {model}: {login}",
+        name=f"ИнфоЛада: {login}" if service == "internet" else f"ИнфоЛада {model}: {login}",
+        configuration_url="https://start.infolada.ru/auth?tab=portal",
     )
 
 
