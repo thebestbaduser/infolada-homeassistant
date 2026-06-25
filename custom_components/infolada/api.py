@@ -72,9 +72,9 @@ class InfoladaApiClient:
         """Authenticate and return normalized account data."""
         await self._ensure_authenticated(force=True)
 
-        contract = await self._api_get("/internet-contract")
-        account = await self._api_get("/internet-account")
-        users = await self._api_get("/user/list")
+        contract = await self._api_get("/v2/internet-contract")
+        account = await self._api_get("/v2/internet-account")
+        users = await self._api_get("/v2/user/list")
 
         return normalize_account_data(
             login=self._login,
@@ -248,6 +248,7 @@ class InfoladaApiClient:
 
         if response.status >= 400:
             message = _extract_error_message(data) or f"API request failed ({response.status})"
+            _LOGGER.error("Infolada API %s returned %s: %s", path, response.status, data)
             raise InfoladaApiError(message)
 
         return data
