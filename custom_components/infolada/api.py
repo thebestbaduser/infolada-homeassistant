@@ -75,12 +75,16 @@ class InfoladaApiClient:
         contract = await self._api_get("/v2/internet-contract")
         account = await self._api_get("/v2/internet-account")
         users = await self._api_get("/v2/user/list")
+        ktv = await self._api_get_optional("/v2/ktv")
+        telephone = await self._api_get_optional("/v2/telephone")
 
         return normalize_account_data(
             login=self._login,
             contract=as_dict(contract),
             account=as_dict(account),
             users=as_user_list(users),
+            ktv=ktv,
+            telephone=telephone,
         )
 
     async def async_validate_credentials(self) -> dict[str, Any]:
@@ -252,6 +256,14 @@ class InfoladaApiClient:
             raise InfoladaApiError(message)
 
         return data
+
+    async def _api_get_optional(self, path: str) -> Any:
+        """Perform an authenticated GET request and ignore missing services."""
+        try:
+            return await self._api_get(path)
+        except InfoladaApiError as err:
+            _LOGGER.debug("Optional Infolada endpoint unavailable at %s: %s", path, err)
+            return None
 
     async def _request(
         self,

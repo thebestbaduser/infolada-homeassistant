@@ -15,13 +15,19 @@ from .const import (
 )
 
 
-def build_device_info(login: str, login_slug: str) -> DeviceInfo:
-    """Build shared device metadata for entities."""
+def build_device_info(login: str, login_slug: str, service: str = "internet") -> DeviceInfo:
+    """Build device metadata for a service type."""
+    service_names = {
+        "internet": ("Personal Account", "login"),
+        "ktv": ("Cable TV", "ktv"),
+        "telephone": ("Telephony", "telephone"),
+    }
+    model, suffix = service_names.get(service, service_names["internet"])
     return DeviceInfo(
-        identifiers={(DOMAIN, f"login_{login_slug}")},
+        identifiers={(DOMAIN, f"{suffix}_{login_slug}")},
         manufacturer="Infolada",
-        model="Personal Account",
-        name=f"Infolada: {login}",
+        model=model,
+        name=f"Infolada: {login}" if service == "internet" else f"Infolada {model}: {login}",
     )
 
 

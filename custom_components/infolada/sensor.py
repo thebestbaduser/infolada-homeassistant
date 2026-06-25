@@ -91,7 +91,49 @@ async def async_setup_entry(
             InfoladaLastUpdateSensor(coordinator, entry),
         ]
     )
+
+    if coordinator.data.get("ktv_available"):
+        entities.extend(_build_service_sensors(coordinator, entry, "ktv"))
+    if coordinator.data.get("telephone_available"):
+        entities.extend(_build_service_sensors(coordinator, entry, "telephone"))
+
     async_add_entities(entities)
+
+
+def _build_service_sensors(
+    coordinator: InfoladaDataUpdateCoordinator,
+    entry: ConfigEntry,
+    service: str,
+) -> list[SensorEntity]:
+    """Build balance and plan sensors for optional services."""
+    plan_icon = "mdi:television-classic" if service == "ktv" else "mdi:phone"
+    descriptions = (
+        InfoladaSensorDescription(
+            f"{service}_account",
+            f"{service}_account",
+            f"{service}_account",
+            "mdi:card-account-details-outline",
+            EntityCategory.DIAGNOSTIC,
+        ),
+        InfoladaSensorDescription(
+            f"{service}_plan",
+            f"{service}_plan",
+            f"{service}_plan",
+            plan_icon,
+        ),
+    )
+    sensors: list[SensorEntity] = [
+        InfoladaServiceTextSensor(coordinator, entry, description, service)
+        for description in descriptions
+    ]
+    sensors.extend(
+        [
+            InfoladaServiceBalanceSensor(coordinator, entry, service),
+            InfoladaServiceDebtSensor(coordinator, entry, service),
+            InfoladaServicePlanPriceSensor(coordinator, entry, service),
+        ]
+    )
+    return sensors
 
 
 class InfoladaBaseSensor(
@@ -366,3 +408,175 @@ class InfoladaLastUpdateSensor(InfoladaBaseSensor):
         if count is not None:
             attrs["internet_users_count"] = count
         return attrs
+
+
+class InfoladaServiceSensor(InfoladaBaseSensor):
+    """Base class for optional KTV and telephony sensors."""
+
+    def __init__(
+        self,
+        coordinator: InfoladaDataUpdateCoordinator,
+        entry: ConfigEntry,
+        service: str,
+    ) -> None:
+        """Initialize a service sensor."""
+        super().__init__(coordinator, entry)
+        self._service = service
+        self._attr_device_info = build_device_info(self._login, self._login_slug, service)
+
+
+class InfoladaServiceTextSensor(InfoladaServiceSensor):
+    """Text sensor for an optional service."""
+
+    def __init__(
+        self,
+        coordinator: InfoladaDataUpdateCoordinator,
+        entry: ConfigEntry,
+        description: InfoladaSensorDescription,
+        service: str,
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, entry, service)
+        self._description = description
+        self._attr_translation_key = description.translation_key
+        self._attr_icon = description.icon
+        self._attr_entity_category = description.entity_category
+        self._attr_entity_registry_enabled_default = description.enabled_by_default
+        self._attr_unique_id = f"{entry.entry_id}_{self._login_slug}_{description.key}"
+        self.entity_id = f"sensor.infolada_{self._login_slug}_{description.key}"
+
+    @property
+    def native_value(self) -> str | None:
+        """Return the normalized value."""
+        value = self.coordinator.data.get(self._description.value_key)
+        if value is not None:
+            return str(value)
+        return self._restored_state
+
+
+class InfoladaServiceBalanceSensor(InfoladaServiceSensor):
+    """Balance sensor for KTV or telephony."""
+
+    _attr_device_class = SensorDeviceClass.MONETARY
+    _attr_icon = "mdi:wallet-outline"
+    _attr_suggested_display_precision = 2
+
+    def __init__(
+        self,
+        coordinator: InfoladaDataUpdateCoordinator,
+        entry: ConfigEntry,
+        service: str,
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, entry, service)
+        self._value_key = f"{service}_balance"
+        self._attr_translation_key = f"{service}_balance"
+        self._attr_unique_id = f"{entry.entry_id}_{self._login_slug}_{self._value_key}"
+        self.entity_id = f"sensor.infolada_{self._login_slug}_{self._value_key}"
+
+    @property
+    def native_unit_of_measurement(self) -> str:
+        """Return the balance currency."""
+        return str(self.coordinator.data.get("balance_currency") or DEFAULT_CURRENCY)
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the service balance."""
+        value = self.coordinator.data.get(self._value_key)
+        if isinstance(value, (int, float)):
+            return float(value)
+        if self._restored_state is None:
+            return None
+        try:
+            return float(self._restored_state)
+        except (TypeError, ValueError):
+            return None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return service balance metadata."""
+        attrs = super().extra_state_attributes
+        can_pay = self.coordinator.data.get(f"{self._service}_can_pay")
+        if can_pay is not None:
+            attrs["can_pay"] = can_pay
+        return attrs
+
+
+class InfoladaServiceDebtSensor(InfoladaServiceSensor):
+    """Debt sensor for KTV or telephony."""
+
+    _attr_device_class = SensorDeviceClass.MONETARY
+    _attr_icon = "mdi:cash-minus"
+    _attr_suggested_display_precision = 2
+    _attr_entity_registry_enabled_default = False
+
+    def __init__(
+        self,
+        coordinator: InfoladaDataUpdateCoordinator,
+        entry: ConfigEntry,
+        service: str,
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, entry, service)
+        self._value_key = f"{service}_debt"
+        self._attr_translation_key = f"{service}_debt"
+        self._attr_unique_id = f"{entry.entry_id}_{self._login_slug}_{self._value_key}"
+        self.entity_id = f"sensor.infolada_{self._login_slug}_{self._value_key}"
+
+    @property
+    def native_unit_of_measurement(self) -> str:
+        """Return the currency."""
+        return str(self.coordinator.data.get("balance_currency") or DEFAULT_CURRENCY)
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the service debt."""
+        value = self.coordinator.data.get(self._value_key)
+        if isinstance(value, (int, float)):
+            return float(value)
+        if self._restored_state is None:
+            return None
+        try:
+            return float(self._restored_state)
+        except (TypeError, ValueError):
+            return None
+
+
+class InfoladaServicePlanPriceSensor(InfoladaServiceSensor):
+    """Plan price sensor for KTV or telephony."""
+
+    _attr_device_class = SensorDeviceClass.MONETARY
+    _attr_icon = "mdi:cash"
+    _attr_suggested_display_precision = 2
+    _attr_entity_registry_enabled_default = False
+
+    def __init__(
+        self,
+        coordinator: InfoladaDataUpdateCoordinator,
+        entry: ConfigEntry,
+        service: str,
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, entry, service)
+        self._value_key = f"{service}_plan_price"
+        self._attr_translation_key = f"{service}_plan_price"
+        self._attr_unique_id = f"{entry.entry_id}_{self._login_slug}_{self._value_key}"
+        self.entity_id = f"sensor.infolada_{self._login_slug}_{self._value_key}"
+
+    @property
+    def native_unit_of_measurement(self) -> str:
+        """Return the currency."""
+        return str(self.coordinator.data.get("balance_currency") or DEFAULT_CURRENCY)
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the plan price."""
+        value = self.coordinator.data.get(self._value_key)
+        if isinstance(value, (int, float)):
+            return float(value)
+        if self._restored_state is None:
+            return None
+        try:
+            return float(self._restored_state)
+        except (TypeError, ValueError):
+            return None

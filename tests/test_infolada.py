@@ -76,6 +76,30 @@ class TestInfoladaNormalization(unittest.TestCase):
         self.assertEqual(data["internet_status"], "Включен")
         self.assertEqual(data["internet_users_count"], 1)
 
+    def test_normalize_ktv_account(self) -> None:
+        """Build normalized KTV account data."""
+        data = models.normalize_account_data(
+            login="demo",
+            contract={},
+            account={},
+            users=[],
+            ktv={
+                "account_no": "1121920356",
+                "can_pay": True,
+                "plan_price": 240,
+                "balance": 20,
+                "debt": 0,
+                "plan": "Тарифный план \"Основной\" 200",
+            },
+            telephone=[],
+        )
+
+        self.assertTrue(data["ktv_available"])
+        self.assertEqual(data["ktv_account"], "1121920356")
+        self.assertEqual(data["ktv_balance"], 20.0)
+        self.assertEqual(data["ktv_plan_price"], 240.0)
+        self.assertFalse(data["telephone_available"])
+
     def test_to_float(self) -> None:
         """Parse numeric strings from the API."""
         self.assertEqual(models.to_float("1 234,56"), 1234.56)

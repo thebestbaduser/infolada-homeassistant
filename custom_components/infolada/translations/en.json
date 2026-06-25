@@ -69,6 +69,36 @@
       },
       "last_update": {
         "name": "Last update"
+      },
+      "ktv_balance": {
+        "name": "Balance"
+      },
+      "ktv_plan": {
+        "name": "Tariff plan"
+      },
+      "ktv_account": {
+        "name": "Account number"
+      },
+      "ktv_debt": {
+        "name": "Debt"
+      },
+      "ktv_plan_price": {
+        "name": "Tariff price"
+      },
+      "telephone_balance": {
+        "name": "Balance"
+      },
+      "telephone_plan": {
+        "name": "Tariff plan"
+      },
+      "telephone_account": {
+        "name": "Account number"
+      },
+      "telephone_debt": {
+        "name": "Debt"
+      },
+      "telephone_plan_price": {
+        "name": "Tariff price"
       }
     }
   }

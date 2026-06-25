@@ -16,6 +16,8 @@ def normalize_account_data(
     contract: dict[str, Any],
     account: dict[str, Any],
     users: list[dict[str, Any]],
+    ktv: Any = None,
+    telephone: Any = None,
 ) -> dict[str, Any]:
     """Map API payloads to integration data."""
     internet_users = [
@@ -26,6 +28,8 @@ def normalize_account_data(
     state = primary_user.get("state") if isinstance(primary_user.get("state"), dict) else {}
     internet_status = state.get("title") or state.get("name") or primary_user.get("type_definition")
     current_tariff = _extract_tariff_name(primary_user)
+    ktv_data = _normalize_service_account(ktv, "ktv")
+    telephone_data = _normalize_service_account(telephone, "telephone")
 
     return {
         "login": login,
@@ -50,9 +54,35 @@ def normalize_account_data(
             }
             for user in internet_users
         ],
+        **ktv_data,
+        **telephone_data,
         "raw_contract": contract,
         "raw_account": account,
+        "raw_ktv": ktv if isinstance(ktv, dict) else {},
+        "raw_telephone": telephone if isinstance(telephone, dict) else {},
     }
+
+
+def _normalize_service_account(payload: Any, prefix: str) -> dict[str, Any]:
+    """Normalize KTV or telephony account payloads."""
+    available_key = f"{prefix}_available"
+    if isinstance(payload, list) or not payload:
+        return {available_key: False}
+
+    data = as_dict(payload)
+    if not data.get("account_no"):
+        return {available_key: False}
+
+    result: dict[str, Any] = {
+        available_key: True,
+        f"{prefix}_account": as_str(data.get("account_no")),
+        f"{prefix}_balance": to_float(data.get("balance")),
+        f"{prefix}_debt": to_float(data.get("debt")),
+        f"{prefix}_plan": as_str(data.get("plan")),
+        f"{prefix}_plan_price": to_float(data.get("plan_price")),
+        f"{prefix}_can_pay": bool(data.get("can_pay")),
+    }
+    return result
 
 
 def _extract_tariff_name(user: dict[str, Any]) -> str | None:

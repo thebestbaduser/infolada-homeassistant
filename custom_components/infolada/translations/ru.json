@@ -69,6 +69,36 @@
       },
       "last_update": {
         "name": "Последнее обновление"
+      },
+      "ktv_balance": {
+        "name": "Баланс"
+      },
+      "ktv_plan": {
+        "name": "Тарифный план"
+      },
+      "ktv_account": {
+        "name": "Номер счёта"
+      },
+      "ktv_debt": {
+        "name": "Задолженность"
+      },
+      "ktv_plan_price": {
+        "name": "Стоимость тарифа"
+      },
+      "telephone_balance": {
+        "name": "Баланс"
+      },
+      "telephone_plan": {
+        "name": "Тарифный план"
+      },
+      "telephone_account": {
+        "name": "Номер счёта"
+      },
+      "telephone_debt": {
+        "name": "Задолженность"
+      },
+      "telephone_plan_price": {
+        "name": "Стоимость тарифа"
       }
     }
   }
