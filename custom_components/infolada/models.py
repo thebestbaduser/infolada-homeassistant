@@ -25,6 +25,7 @@ def normalize_account_data(
 
     state = primary_user.get("state") if isinstance(primary_user.get("state"), dict) else {}
     internet_status = state.get("title") or state.get("name") or primary_user.get("type_definition")
+    current_tariff = _extract_tariff_name(primary_user)
 
     return {
         "login": login,
@@ -37,14 +38,14 @@ def normalize_account_data(
         "traffic_mb": to_float(account.get("bytes_in_balance")),
         "can_pay": bool(account.get("can_pay")),
         "internet_login": as_str(primary_user.get("login") or primary_user.get("user_name")),
-        "current_tariff": as_str(primary_user.get("type_definition")),
+        "current_tariff": current_tariff,
         "internet_status": as_str(internet_status),
         "internet_users_count": len(internet_users),
         "internet_users": [
             {
                 "user_id": user.get("user_id"),
                 "login": user.get("login") or user.get("user_name"),
-                "tariff": user.get("type_definition"),
+                "tariff": _extract_tariff_name(user) or user.get("type_definition"),
                 "user_type": user.get("user_type"),
             }
             for user in internet_users
@@ -52,6 +53,24 @@ def normalize_account_data(
         "raw_contract": contract,
         "raw_account": account,
     }
+
+
+def _extract_tariff_name(user: dict[str, Any]) -> str | None:
+    """Return the human-readable tariff name from a user payload."""
+    plan = user.get("plan")
+    if isinstance(plan, dict):
+        for key in ("plan_name_print", "plan_name", "name", "title"):
+            value = as_str(plan.get(key))
+            if value:
+                return value
+    for key in ("programm_name", "program_name", "tariff_name"):
+        value = as_str(user.get(key))
+        if value:
+            return value
+    value = as_str(user.get("type_definition"))
+    if value and value.lower() not in {"пользователь интернет", "internet user"}:
+        return value
+    return None
 
 
 def as_dict(value: Any) -> dict[str, Any]:

@@ -59,8 +59,9 @@ class TestInfoladaNormalization(unittest.TestCase):
                     "user_id": 1,
                     "user_type": "ethernet",
                     "login": "demo",
-                    "type_definition": "Интернет 100 Мбит/с",
-                    "state": {"title": "Активен"},
+                    "type_definition": "Пользователь интернет",
+                    "plan": {"plan_name_print": "Интернет 100 Мбит/с"},
+                    "state": {"title": "Включен"},
                 }
             ],
         )
@@ -72,7 +73,7 @@ class TestInfoladaNormalization(unittest.TestCase):
         self.assertEqual(data["bonus"], 10.0)
         self.assertEqual(data["traffic_mb"], 1024.0)
         self.assertEqual(data["current_tariff"], "Интернет 100 Мбит/с")
-        self.assertEqual(data["internet_status"], "Активен")
+        self.assertEqual(data["internet_status"], "Включен")
         self.assertEqual(data["internet_users_count"], 1)
 
     def test_to_float(self) -> None:
