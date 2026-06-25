@@ -19,7 +19,13 @@ from .const import (
     LK_URL,
     PORTAL_URL,
 )
-from .models import as_dict, as_user_list, normalize_account_data
+from .models import (
+    as_dict,
+    as_user_list,
+    merge_user_payload,
+    normalize_account_data,
+    select_primary_internet_user,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -74,7 +80,8 @@ class InfoladaApiClient:
 
         contract = await self._api_get("/v2/internet-contract")
         account = await self._api_get("/v2/internet-account")
-        users = await self._api_get("/v2/user/list")
+        users = as_user_list(await self._api_get("/v2/user/list"))
+        users = await self._enrich_users(users)
         ktv = await self._api_get_optional("/v2/ktv")
         telephone = await self._api_get_optional("/v2/telephone")
 
@@ -82,10 +89,34 @@ class InfoladaApiClient:
             login=self._login,
             contract=as_dict(contract),
             account=as_dict(account),
-            users=as_user_list(users),
+            users=users,
             ktv=ktv,
             telephone=telephone,
         )
+
+    async def _enrich_users(self, users: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Load detailed user and plan payloads used by the web cabinet."""
+        primary_user = select_primary_internet_user(users)
+        user_id = primary_user.get("user_id")
+        if not user_id:
+            return users
+
+        user_detail = await self._api_get_optional(f"/v2/user/{user_id}")
+        program_info = await self._api_get_optional(f"/v2/user-program/info/{user_id}")
+        days_left = await self._api_get_optional(f"/v2/user-program/days-left/{user_id}")
+
+        enriched = merge_user_payload(primary_user, as_dict(user_detail), as_dict(program_info))
+        if days_left is not None and enriched.get("left_day") is None:
+            if isinstance(days_left, dict):
+                enriched["left_day"] = days_left.get("left_day", days_left.get("days_left"))
+            else:
+                enriched["left_day"] = days_left
+
+        for index, user in enumerate(users):
+            if user.get("user_id") == user_id:
+                users[index] = enriched
+                break
+        return users
 
     async def async_validate_credentials(self) -> dict[str, Any]:
         """Validate credentials and return account data."""

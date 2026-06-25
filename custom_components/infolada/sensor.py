@@ -417,7 +417,12 @@ class InfoladaTimestampSensor(InfoladaBaseSensor):
             value = self._restored_state
         if value is None:
             return None
-        return dt_util.parse_datetime(str(value))
+        parsed = dt_util.parse_datetime(str(value))
+        if parsed is None:
+            return None
+        if parsed.tzinfo is None:
+            return dt_util.as_local(parsed)
+        return parsed
 
 
 class InfoladaTariffDaysLeftSensor(InfoladaBaseSensor):

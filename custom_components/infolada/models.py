@@ -10,6 +10,17 @@ from .const import DEFAULT_CURRENCY, INTERNET_USER_TYPES
 
 _LOGGER = logging.getLogger(__name__)
 
+_PLAN_DATE_FORMATS = (
+    "%d.%m.%Y %H:%M:%S",
+    "%d.%m.%Y %H:%M",
+    "%d.%m.%Y",
+)
+_PLAN_DATE_KEYS = (
+    ("date_on", "date_off", "left_day"),
+    ("dateOn", "dateOff", "leftDay"),
+    ("date_start", "date_end", "days_left"),
+)
+
 
 def normalize_account_data(
     *,
@@ -24,7 +35,7 @@ def normalize_account_data(
     internet_users = [
         user for user in users if str(user.get("user_type", "")).lower() in INTERNET_USER_TYPES
     ]
-    primary_user = internet_users[0] if internet_users else (users[0] if users else {})
+    primary_user = select_primary_internet_user(users)
 
     state = primary_user.get("state") if isinstance(primary_user.get("state"), dict) else {}
     internet_status = state.get("title") or state.get("name") or primary_user.get("type_definition")
@@ -101,43 +112,78 @@ def format_fio_initials(name: str | None) -> str | None:
 
 
 def parse_infolada_datetime(value: Any) -> str | None:
-    """Parse API datetime 'DD.MM.YYYY HH:MM:SS' to an ISO string."""
+    """Parse API datetime values to an ISO string."""
     text = as_str(value)
     if not text:
         return None
-    try:
-        return datetime.strptime(text, "%d.%m.%Y %H:%M:%S").isoformat()
-    except ValueError:
-        _LOGGER.debug("Failed to parse datetime value: %s", value)
-        return None
+    for fmt in _PLAN_DATE_FORMATS:
+        try:
+            return datetime.strptime(text, fmt).isoformat()
+        except ValueError:
+            continue
+    _LOGGER.debug("Failed to parse datetime value: %s", value)
+    return None
+
+
+def select_primary_internet_user(users: list[dict[str, Any]]) -> dict[str, Any]:
+    """Return the primary internet user from a user list payload."""
+    internet_users = [
+        user for user in users if str(user.get("user_type", "")).lower() in INTERNET_USER_TYPES
+    ]
+    return internet_users[0] if internet_users else (users[0] if users else {})
+
+
+def merge_user_payload(*sources: dict[str, Any] | None) -> dict[str, Any]:
+    """Merge user payloads, keeping nested plan fields from all sources."""
+    merged: dict[str, Any] = {}
+    for source in sources:
+        if not isinstance(source, dict):
+            continue
+        plan = merged.get("plan") if isinstance(merged.get("plan"), dict) else {}
+        incoming_plan = source.get("plan") if isinstance(source.get("plan"), dict) else {}
+        merged = {**merged, **source}
+        if plan or incoming_plan:
+            merged["plan"] = {**plan, **incoming_plan}
+    return merged
 
 
 def _extract_plan_fields(user: dict[str, Any]) -> dict[str, Any]:
-    """Return tariff period fields from a user plan payload."""
-    plan = user.get("plan")
-    if not isinstance(plan, dict):
-        return {
-            "tariff_date_on": None,
-            "tariff_date_off": None,
-            "tariff_days_left": None,
-        }
+    """Return tariff period fields from a user or plan payload."""
+    sources: list[dict[str, Any]] = []
+    if isinstance(user, dict):
+        sources.append(user)
+        plan = user.get("plan")
+        if isinstance(plan, dict):
+            sources.append(plan)
 
-    left_day = plan.get("left_day")
+    date_on: str | None = None
+    date_off: str | None = None
     days_left: int | None = None
-    if left_day is not None and left_day != "":
-        if isinstance(left_day, bool):
-            days_left = None
-        elif isinstance(left_day, int):
-            days_left = left_day
-        else:
-            parsed = to_float(left_day)
-            days_left = int(parsed) if parsed is not None else None
+
+    for source in sources:
+        for on_key, off_key, left_key in _PLAN_DATE_KEYS:
+            if date_on is None:
+                date_on = parse_infolada_datetime(source.get(on_key))
+            if date_off is None:
+                date_off = parse_infolada_datetime(source.get(off_key))
+            if days_left is None:
+                days_left = _parse_days_left(source.get(left_key))
 
     return {
-        "tariff_date_on": parse_infolada_datetime(plan.get("date_on")),
-        "tariff_date_off": parse_infolada_datetime(plan.get("date_off")),
+        "tariff_date_on": date_on,
+        "tariff_date_off": date_off,
         "tariff_days_left": days_left,
     }
+
+
+def _parse_days_left(value: Any) -> int | None:
+    """Parse the days-left counter from API payloads."""
+    if value is None or value == "" or isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    parsed = to_float(value)
+    return int(parsed) if parsed is not None else None
 
 
 def _extract_tariff_name(user: dict[str, Any]) -> str | None:

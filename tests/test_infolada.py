@@ -128,7 +128,33 @@ class TestInfoladaNormalization(unittest.TestCase):
             models.parse_infolada_datetime("01.07.2020 00:44:41"),
             "2020-07-01T00:44:41",
         )
+        self.assertEqual(
+            models.parse_infolada_datetime("03.07.2026"),
+            "2026-07-03T00:00:00",
+        )
         self.assertIsNone(models.parse_infolada_datetime("invalid"))
+
+    def test_merge_user_payload(self) -> None:
+        """Merge list and detail user payloads."""
+        merged = models.merge_user_payload(
+            {
+                "user_id": 1,
+                "login": "demo",
+                "plan": {"plan_name_print": "Интернет 100 Мбит/с"},
+            },
+            {
+                "user_id": 1,
+                "plan": {
+                    "date_on": "01.07.2020 00:44:41",
+                    "date_off": "03.07.2026 23:59:59",
+                    "left_day": 8,
+                },
+            },
+        )
+        fields = models._extract_plan_fields(merged)
+        self.assertEqual(fields["tariff_date_on"], "2020-07-01T00:44:41")
+        self.assertEqual(fields["tariff_date_off"], "2026-07-03T23:59:59")
+        self.assertEqual(fields["tariff_days_left"], 8)
 
 
 if __name__ == "__main__":
