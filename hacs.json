@@ -1,0 +1,6 @@
+{
+  "name": "Infolada",
+  "content_in_root": false,
+  "country": ["RU"],
+  "homeassistant": "2024.1.0"
+}

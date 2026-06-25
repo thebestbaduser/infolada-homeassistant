@@ -1,0 +1,74 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Добавление аккаунта ИнфоЛада",
+        "description": "Введите логин и пароль от личного кабинета https://start.infolada.ru/auth?tab=portal.",
+        "data": {
+          "login": "Логин",
+          "password": "Пароль"
+        }
+      },
+      "settings": {
+        "title": "Настройки интеграции",
+        "description": "Задайте период обновления.",
+        "data": {
+          "scan_interval": "Интервал обновления"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Не удалось подключиться к сайту ИнфоЛада.",
+      "invalid_auth": "Неверный логин или пароль.",
+      "unknown": "Непредвиденная ошибка."
+    },
+    "abort": {
+      "already_configured": "Этот аккаунт уже настроен."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Настройки интеграции",
+        "description": "Задайте период обновления.",
+        "data": {
+          "scan_interval": "Интервал обновления"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "contract_number": {
+        "name": "Номер договора"
+      },
+      "contract_owner": {
+        "name": "Контрагент"
+      },
+      "internet_login": {
+        "name": "Логин интернета"
+      },
+      "current_tariff": {
+        "name": "Текущий тариф"
+      },
+      "internet_status": {
+        "name": "Статус интернета"
+      },
+      "current_balance": {
+        "name": "Баланс"
+      },
+      "need_pay": {
+        "name": "Рекомендуемое пополнение"
+      },
+      "bonus": {
+        "name": "Бонусы"
+      },
+      "traffic_mb": {
+        "name": "Остаток трафика"
+      },
+      "last_update": {
+        "name": "Последнее обновление"
+      }
+    }
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add Infolada account",
+        "description": "Enter your Infolada personal account login and password from https://start.infolada.ru/auth?tab=portal.",
+        "data": {
+          "login": "Login",
+          "password": "Password"
+        }
+      },
+      "settings": {
+        "title": "Integration settings",
+        "description": "Set the update interval.",
+        "data": {
+          "scan_interval": "Update interval"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to the Infolada website.",
+      "invalid_auth": "Invalid login or password.",
+      "unknown": "Unexpected error."
+    },
+    "abort": {
+      "already_configured": "This account is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Integration settings",
+        "description": "Set the update interval.",
+        "data": {
+          "scan_interval": "Update interval"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "contract_number": {
+        "name": "Contract number"
+      },
+      "contract_owner": {
+        "name": "Contract owner"
+      },
+      "internet_login": {
+        "name": "Internet login"
+      },
+      "current_tariff": {
+        "name": "Current tariff"
+      },
+      "internet_status": {
+        "name": "Internet status"
+      },
+      "current_balance": {
+        "name": "Balance"
+      },
+      "need_pay": {
+        "name": "Recommended top-up"
+      },
+      "bonus": {
+        "name": "Bonuses"
+      },
+      "traffic_mb": {
+        "name": "Traffic balance"
+      },
+      "last_update": {
+        "name": "Last update"
+      }
+    }
+  }
+}
