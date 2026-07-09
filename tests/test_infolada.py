@@ -156,6 +156,33 @@ class TestInfoladaNormalization(unittest.TestCase):
         self.assertEqual(fields["tariff_date_off"], "2026-07-03T23:59:59")
         self.assertEqual(fields["tariff_days_left"], 8)
 
+    def test_normalize_omits_raw_payloads(self) -> None:
+        """Normalized data must not keep full raw API payloads in memory."""
+        data = models.normalize_account_data(
+            login="demo",
+            contract={"conto_num": "1", "secret": "x"},
+            account={"balance": 1},
+            users=[],
+            ktv={"account_no": "1", "balance": 0},
+            telephone=None,
+        )
+        for key in ("raw_contract", "raw_account", "raw_ktv", "raw_telephone"):
+            self.assertNotIn(key, data)
+
+    def test_select_primary_internet_user(self) -> None:
+        """Prefer internet user types over other accounts."""
+        users = [
+            {"user_id": 1, "user_type": "ktv", "login": "tv"},
+            {"user_id": 2, "user_type": "ethernet", "login": "net"},
+        ]
+        primary = models.select_primary_internet_user(users)
+        self.assertEqual(primary["user_id"], 2)
+
+    def test_as_dict_unwraps_nested_payload(self) -> None:
+        """Unwrap common API envelope keys."""
+        self.assertEqual(models.as_dict({"data": {"balance": 10}}), {"balance": 10})
+        self.assertEqual(models.as_dict([1, 2]), {})
+
 
 if __name__ == "__main__":
     unittest.main()

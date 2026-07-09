@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_PASSWORD
+from homeassistant.const import CONF_PASSWORD, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
@@ -12,10 +14,19 @@ from .api import InfoladaApiClient, InfoladaAuthError
 from .const import CONF_LOGIN, DOMAIN
 from .coordinator import InfoladaDataUpdateCoordinator
 
-type InfoladaConfigEntry = ConfigEntry[InfoladaApiClient]
-
-PLATFORMS = ["sensor"]
+PLATFORMS = [Platform.SENSOR]
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
+
+@dataclass
+class InfoladaRuntimeData:
+    """Runtime data for an Infolada config entry."""
+
+    client: InfoladaApiClient
+    coordinator: InfoladaDataUpdateCoordinator
+
+
+type InfoladaConfigEntry = ConfigEntry[InfoladaRuntimeData]
 
 
 async def async_setup(hass: HomeAssistant, _config: dict) -> bool:
@@ -37,27 +48,35 @@ async def async_setup_entry(hass: HomeAssistant, entry: InfoladaConfigEntry) -> 
 
     try:
         await coordinator.async_config_entry_first_refresh()
+    except ConfigEntryAuthFailed:
+        await client.async_close()
+        raise
     except InfoladaAuthError as err:
+        await client.async_close()
         raise ConfigEntryAuthFailed(str(err)) from err
     except Exception as err:
+        await client.async_close()
         raise ConfigEntryNotReady(str(err)) from err
 
-    hass.data[DOMAIN][entry.entry_id] = {
-        "client": client,
-        "coordinator": coordinator,
-    }
-    entry.runtime_data = client
+    runtime = InfoladaRuntimeData(client=client, coordinator=coordinator)
+    entry.runtime_data = runtime
+    hass.data[DOMAIN][entry.entry_id] = runtime
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: InfoladaConfigEntry) -> bool:
     """Unload an Infolada config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if not unload_ok:
         return False
-    hass.data[DOMAIN].pop(entry.entry_id, None)
+
+    runtime = hass.data[DOMAIN].pop(entry.entry_id, None)
+    if runtime is None and hasattr(entry, "runtime_data"):
+        runtime = entry.runtime_data
+    if runtime is not None:
+        await runtime.client.async_close()
     return True
 
 

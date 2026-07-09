@@ -2,8 +2,8 @@
   "config": {
     "step": {
       "user": {
-        "title": "ИнфоЛада",
-        "description": "Подключите личный кабинет интернет-провайдера ИнфоЛада (Тольятти). Введите логин и пароль от https://start.infolada.ru/auth?tab=portal.",
+        "title": "Infolada",
+        "description": "Connect your Infolada personal account (Tolyatti, Russia). Enter login and password from https://start.infolada.ru/auth?tab=portal.",
         "data": {
           "login": "Login",
           "password": "Password"
@@ -15,6 +15,13 @@
         "data": {
           "scan_interval": "Update interval"
         }
+      },
+      "reauth_confirm": {
+        "title": "Reauthenticate Infolada",
+        "description": "The password for {login} is no longer valid. Enter the current password.",
+        "data": {
+          "password": "Password"
+        }
       }
     },
     "error": {
@@ -24,7 +31,8 @@
       "unknown": "Unexpected error. Check Home Assistant logs."
     },
     "abort": {
-      "already_configured": "This account is already configured."
+      "already_configured": "This account is already configured.",
+      "reauth_successful": "Reauthentication successful."
     }
   },
   "options": {

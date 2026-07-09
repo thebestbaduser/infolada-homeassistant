@@ -74,9 +74,14 @@ class InfoladaApiClient:
         self._password = password
         self._authenticated = False
 
+    async def async_close(self) -> None:
+        """Close the underlying HTTP session."""
+        if not self._session.closed:
+            await self._session.close()
+
     async def async_fetch_data(self) -> dict[str, Any]:
-        """Authenticate and return normalized account data."""
-        await self._ensure_authenticated(force=True)
+        """Authenticate when needed and return normalized account data."""
+        await self._ensure_authenticated()
 
         contract = await self._api_get("/v2/internet-contract")
         account = await self._api_get("/v2/internet-account")
@@ -274,7 +279,7 @@ class InfoladaApiClient:
 
         response, data = await self._request("GET", f"{API_URL}{path}", headers=headers)
 
-        if response.status in {401, 403} or _is_missing_api_auth(response.status, data):
+        if response.status in {401, 403}:
             if not _retry:
                 raise InfoladaAuthError("API authentication failed")
             self._authenticated = False
@@ -283,7 +288,12 @@ class InfoladaApiClient:
 
         if response.status >= 400:
             message = _extract_error_message(data) or f"API request failed ({response.status})"
-            _LOGGER.error("Infolada API %s returned %s: %s", path, response.status, data)
+            _LOGGER.error(
+                "Infolada API %s returned %s: %s",
+                path,
+                response.status,
+                _safe_log_payload(data),
+            )
             raise InfoladaApiError(message)
 
         return data
@@ -295,6 +305,7 @@ class InfoladaApiClient:
         except InfoladaApiError as err:
             _LOGGER.debug("Optional Infolada endpoint unavailable at %s: %s", path, err)
             return None
+        # Auth errors propagate so the coordinator can trigger reauth.
 
     async def _request(
         self,
@@ -373,6 +384,15 @@ def _is_refresh_expire(data: Any) -> bool:
     return isinstance(data, dict) and data.get("name") == "RefreshExpireException"
 
 
-def _is_missing_api_auth(status: int, data: Any) -> bool:
-    """Return whether an API 404 likely means the bearer token is invalid."""
-    return status == 404 and isinstance(data, dict) and data.get("statusCode") == 404
+def _safe_log_payload(data: Any) -> Any:
+    """Return a log-safe representation of an API payload."""
+    if not isinstance(data, dict):
+        return data
+    redacted = dict(data)
+    for key in ("token", "access_token", "refresh_token", "password", "authorization"):
+        if key in redacted:
+            redacted[key] = "***"
+    message = redacted.get("message")
+    if isinstance(message, str) and len(message) > 500:
+        redacted["message"] = f"{message[:500]}…"
+    return redacted
