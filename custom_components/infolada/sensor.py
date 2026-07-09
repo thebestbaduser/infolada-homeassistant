@@ -77,7 +77,11 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Infolada sensors from a config entry."""
-    coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
+    runtime = entry.runtime_data if hasattr(entry, "runtime_data") else None
+    if runtime is not None and hasattr(runtime, "coordinator"):
+        coordinator = runtime.coordinator
+    else:
+        coordinator = hass.data[DOMAIN][entry.entry_id].coordinator
     entities: list[SensorEntity] = [
         InfoladaTextSensor(coordinator, entry, description)
         for description in SENSOR_DESCRIPTIONS
@@ -188,18 +192,20 @@ class InfoladaBaseSensor(
     @property
     def available(self) -> bool:
         """Keep entities available while live or restored data exists."""
-        return self._has_live_data or self._restored_state is not None
+        if self.coordinator.last_update_success and self._data:
+            return True
+        return self._restored_state is not None
 
     @property
-    def _has_live_data(self) -> bool:
-        """Return whether the coordinator currently has live data."""
-        return bool(self.coordinator.data)
+    def _data(self) -> dict[str, Any]:
+        """Return coordinator data or an empty mapping."""
+        return self.coordinator.data or {}
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return common attributes."""
         attrs: dict[str, Any] = {}
-        login = self.coordinator.data.get("login") or self._entry.data.get(CONF_LOGIN)
+        login = self._data.get("login") or self._entry.data.get(CONF_LOGIN)
         if login:
             attrs["login"] = login
         return attrs
@@ -227,7 +233,7 @@ class InfoladaTextSensor(InfoladaBaseSensor):
     @property
     def native_value(self) -> str | None:
         """Return the normalized value."""
-        value = self.coordinator.data.get(self._description.value_key)
+        value = self._data.get(self._description.value_key)
         if value is not None:
             return str(value)
         return self._restored_state
@@ -254,12 +260,12 @@ class InfoladaBalanceSensor(InfoladaBaseSensor):
     @property
     def native_unit_of_measurement(self) -> str:
         """Return the balance currency."""
-        return str(self.coordinator.data.get("balance_currency") or DEFAULT_CURRENCY)
+        return str(self._data.get("balance_currency") or DEFAULT_CURRENCY)
 
     @property
     def native_value(self) -> float | None:
         """Return the current balance."""
-        value = self.coordinator.data.get("current_balance")
+        value = self._data.get("current_balance")
         if isinstance(value, (int, float)):
             return float(value)
         if self._restored_state is None:
@@ -275,8 +281,8 @@ class InfoladaBalanceSensor(InfoladaBaseSensor):
         attrs = super().extra_state_attributes
         attrs["currency"] = self.native_unit_of_measurement
         attrs["payment_url"] = PAYMENT_URL
-        if self.coordinator.data.get("can_pay") is not None:
-            attrs["can_pay"] = self.coordinator.data["can_pay"]
+        if self._data.get("can_pay") is not None:
+            attrs["can_pay"] = self._data["can_pay"]
         return attrs
 
 
@@ -302,12 +308,12 @@ class InfoladaNeedPaySensor(InfoladaBaseSensor):
     @property
     def native_unit_of_measurement(self) -> str:
         """Return the currency."""
-        return str(self.coordinator.data.get("balance_currency") or DEFAULT_CURRENCY)
+        return str(self._data.get("balance_currency") or DEFAULT_CURRENCY)
 
     @property
     def native_value(self) -> float | None:
         """Return the recommended payment amount."""
-        value = self.coordinator.data.get("need_pay")
+        value = self._data.get("need_pay")
         if isinstance(value, (int, float)):
             return float(value)
         if self._restored_state is None:
@@ -339,7 +345,7 @@ class InfoladaBonusSensor(InfoladaBaseSensor):
     @property
     def native_value(self) -> float | None:
         """Return the bonus balance."""
-        value = self.coordinator.data.get("bonus")
+        value = self._data.get("bonus")
         if isinstance(value, (int, float)):
             return float(value)
         if self._restored_state is None:
@@ -372,7 +378,7 @@ class InfoladaTrafficSensor(InfoladaBaseSensor):
     @property
     def native_value(self) -> float | None:
         """Return the traffic balance."""
-        value = self.coordinator.data.get("traffic_mb")
+        value = self._data.get("traffic_mb")
         if isinstance(value, (int, float)):
             return float(value)
         if self._restored_state is None:
@@ -412,7 +418,7 @@ class InfoladaTimestampSensor(InfoladaBaseSensor):
     @property
     def native_value(self):
         """Return the parsed timestamp."""
-        value = self.coordinator.data.get(self._value_key)
+        value = self._data.get(self._value_key)
         if value is None:
             value = self._restored_state
         if value is None:
@@ -446,7 +452,7 @@ class InfoladaTariffDaysLeftSensor(InfoladaBaseSensor):
     @property
     def native_value(self) -> int | None:
         """Return the number of days left on the tariff."""
-        value = self.coordinator.data.get("tariff_days_left")
+        value = self._data.get("tariff_days_left")
         if isinstance(value, int):
             return value
         if isinstance(value, float):
@@ -481,7 +487,7 @@ class InfoladaLastUpdateSensor(InfoladaBaseSensor):
     @property
     def native_value(self):
         """Return the last successful update time."""
-        value = self.coordinator.data.get("updated_at")
+        value = self._data.get("updated_at")
         if value is None:
             value = self._restored_state
         if value is None:
@@ -492,10 +498,10 @@ class InfoladaLastUpdateSensor(InfoladaBaseSensor):
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return update metadata."""
         attrs = super().extra_state_attributes
-        users = self.coordinator.data.get("internet_users")
+        users = self._data.get("internet_users")
         if users:
             attrs["internet_users"] = users
-        count = self.coordinator.data.get("internet_users_count")
+        count = self._data.get("internet_users_count")
         if count is not None:
             attrs["internet_users_count"] = count
         return attrs
@@ -539,7 +545,7 @@ class InfoladaServiceTextSensor(InfoladaServiceSensor):
     @property
     def native_value(self) -> str | None:
         """Return the normalized value."""
-        value = self.coordinator.data.get(self._description.value_key)
+        value = self._data.get(self._description.value_key)
         if value is not None:
             return str(value)
         return self._restored_state
@@ -568,12 +574,12 @@ class InfoladaServiceBalanceSensor(InfoladaServiceSensor):
     @property
     def native_unit_of_measurement(self) -> str:
         """Return the balance currency."""
-        return str(self.coordinator.data.get("balance_currency") or DEFAULT_CURRENCY)
+        return str(self._data.get("balance_currency") or DEFAULT_CURRENCY)
 
     @property
     def native_value(self) -> float | None:
         """Return the service balance."""
-        value = self.coordinator.data.get(self._value_key)
+        value = self._data.get(self._value_key)
         if isinstance(value, (int, float)):
             return float(value)
         if self._restored_state is None:
@@ -587,7 +593,7 @@ class InfoladaServiceBalanceSensor(InfoladaServiceSensor):
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return service balance metadata."""
         attrs = super().extra_state_attributes
-        can_pay = self.coordinator.data.get(f"{self._service}_can_pay")
+        can_pay = self._data.get(f"{self._service}_can_pay")
         if can_pay is not None:
             attrs["can_pay"] = can_pay
         return attrs
@@ -617,12 +623,12 @@ class InfoladaServiceDebtSensor(InfoladaServiceSensor):
     @property
     def native_unit_of_measurement(self) -> str:
         """Return the currency."""
-        return str(self.coordinator.data.get("balance_currency") or DEFAULT_CURRENCY)
+        return str(self._data.get("balance_currency") or DEFAULT_CURRENCY)
 
     @property
     def native_value(self) -> float | None:
         """Return the service debt."""
-        value = self.coordinator.data.get(self._value_key)
+        value = self._data.get(self._value_key)
         if isinstance(value, (int, float)):
             return float(value)
         if self._restored_state is None:
@@ -657,12 +663,12 @@ class InfoladaServicePlanPriceSensor(InfoladaServiceSensor):
     @property
     def native_unit_of_measurement(self) -> str:
         """Return the currency."""
-        return str(self.coordinator.data.get("balance_currency") or DEFAULT_CURRENCY)
+        return str(self._data.get("balance_currency") or DEFAULT_CURRENCY)
 
     @property
     def native_value(self) -> float | None:
         """Return the plan price."""
-        value = self.coordinator.data.get(self._value_key)
+        value = self._data.get(self._value_key)
         if isinstance(value, (int, float)):
             return float(value)
         if self._restored_state is None:

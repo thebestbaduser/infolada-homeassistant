@@ -72,10 +72,6 @@ def normalize_account_data(
         ],
         **ktv_data,
         **telephone_data,
-        "raw_contract": contract,
-        "raw_account": account,
-        "raw_ktv": ktv if isinstance(ktv, dict) else {},
-        "raw_telephone": telephone if isinstance(telephone, dict) else {},
     }
 
 

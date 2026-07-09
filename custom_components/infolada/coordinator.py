@@ -30,13 +30,16 @@ class InfoladaDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Initialize the coordinator."""
         self.client = client
         self.entry = entry
+        hours = entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL_HOURS)
+        try:
+            hours = max(1, int(hours))
+        except (TypeError, ValueError):
+            hours = DEFAULT_SCAN_INTERVAL_HOURS
         super().__init__(
             hass,
             logger=_LOGGER,
             name=f"{DOMAIN}_{entry.entry_id}",
-            update_interval=timedelta(
-                hours=entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL_HOURS)
-            ),
+            update_interval=timedelta(hours=hours),
         )
 
     async def _async_update_data(self) -> dict[str, Any]:

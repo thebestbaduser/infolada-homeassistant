@@ -15,6 +15,13 @@
         "data": {
           "scan_interval": "Интервал обновления"
         }
+      },
+      "reauth_confirm": {
+        "title": "Повторный вход в ИнфоЛада",
+        "description": "Пароль для {login} больше не подходит. Введите актуальный пароль.",
+        "data": {
+          "password": "Пароль"
+        }
       }
     },
     "error": {
@@ -24,7 +31,8 @@
       "unknown": "Непредвиденная ошибка. Проверьте журнал Home Assistant."
     },
     "abort": {
-      "already_configured": "Этот аккаунт уже настроен."
+      "already_configured": "Этот аккаунт уже настроен.",
+      "reauth_successful": "Повторная авторизация выполнена."
     }
   },
   "options": {
